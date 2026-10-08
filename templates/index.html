@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>3GPP Specification Downloader</title>
+    <link rel="stylesheet" href="{{ url_for('static', filename='style.css') }}">
+</head>
+<body>
+    <header>
+        <h1>3GPP Specification Downloader</h1>
+        <p class="subtitle">Скачивание спецификаций с 3gpp.org / etsi.org</p>
+    </header>
+
+    <main>
+        <section class="card">
+            <h2>Скачать спецификацию</h2>
+            <form id="download-form">
+                <div class="row">
+                    <div class="field">
+                        <label for="spec">Номер спецификации</label>
+                        <input type="text" id="spec" name="spec" placeholder="29.274" required
+                               list="common-specs" autocomplete="off">
+                        <datalist id="common-specs">
+                            {% for num, title in common_specs.items() %}
+                            <option value="{{ num }}">{{ title }}</option>
+                            {% endfor %}
+                        </datalist>
+                    </div>
+                    <div class="field">
+                        <label for="version">Версия</label>
+                        <select id="version" name="version" required disabled>
+                            <option value="">— выберите версию —</option>
+                        </select>
+                        <button type="button" id="refresh-versions" class="btn small">Обновить список</button>
+                    </div>
+                    <div class="field">
+                        <label for="source">Источник</label>
+                        <select id="source" name="source">
+                            <option value="both">Оба (сначала 3gpp.org)</option>
+                            <option value="3gpp">Только 3gpp.org</option>
+                            <option value="etsi">Только etsi.org</option>
+                        </select>
+                    </div>
+                </div>
+                <div class="row">
+                    <label class="checkbox">
+                        <input type="checkbox" id="extract" checked>
+                        Распаковывать ZIP (3gpp.org)
+                    </label>
+                </div>
+                <div class="row actions">
+                    <button type="submit" class="btn primary" id="download-btn">Скачать</button>
+                </div>
+            </form>
+            <div id="status" class="status"></div>
+            <div id="result" class="result hidden"></div>
+        </section>
+
+        <section class="card">
+            <h2>Пакетное скачивание</h2>
+            <p class="small">Скачайте несколько спецификаций сразу. Укажите по одной
+                <code>номер:версия</code> на строку (например <code>29.274:15.3.0</code>).</p>
+            <form id="batch-form">
+                <div class="row">
+                    <div class="field">
+                        <label for="batch-list">Список спецификаций (номер:версия)</label>
+                        <textarea id="batch-list" name="batch-list" rows="6"
+                                  placeholder="29.274:15.3.0&#10;29.244:16.4.0&#10;23.401:16.0.0"></textarea>
+                    </div>
+                    <div class="field">
+                        <label for="batch-source">Источник</label>
+                        <select id="batch-source" name="source">
+                            <option value="both">Оба (сначала 3gpp.org)</option>
+                            <option value="3gpp">Только 3gpp.org</option>
+                            <option value="etsi">Только etsi.org</option>
+                        </select>
+                        <label class="checkbox" style="margin-top:12px;">
+                            <input type="checkbox" id="batch-extract" checked>
+                            Распаковывать ZIP (3gpp.org)
+                        </label>
+                    </div>
+                </div>
+                <div class="row actions">
+                    <button type="submit" class="btn primary" id="batch-btn">Скачать все</button>
+                </div>
+            </form>
+            <div id="batch-status" class="status"></div>
+            <div id="batch-result" class="result hidden"></div>
+        </section>
+
+        <section class="card">
+            <h2>Популярные спецификации</h2>
+            <table class="spec-table">
+                <thead>
+                    <tr><th>Номер</th><th>Название</th></tr>
+                </thead>
+                <tbody>
+                    {% for num, title in common_specs.items() %}
+                    <tr class="clickable" data-spec="{{ num }}">
+                        <td class="mono">{{ num }}</td>
+                        <td>{{ title }}</td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </section>
+    </main>
+
+    <script>
+        const commonSpecs = {
+            {% for num, title in common_specs.items() %}
+            "{{ num }}": {{ title | tojson }},
+            {% endfor %}
+        };
+
+        const specInput = document.getElementById('spec');
+        const versionSelect = document.getElementById('version');
+        const refreshBtn = document.getElementById('refresh-versions');
+        const form = document.getElementById('download-form');
+        const status = document.getElementById('status');
+        const result = document.getElementById('result');
+
+        function setStatus(text, isError) {
+            status.textContent = text;
+            status.className = 'status' + (isError ? ' error' : '');
+        }
+
+        async function loadVersions(spec) {
+            versionSelect.disabled = true;
+            versionSelect.innerHTML = '<option value="">— загрузка… —</option>';
+            const source = document.getElementById('source').value;
+            setStatus(`Загружаю версии для ${spec} (${source})…`);
+            try {
+                const res = await fetch(`/api/versions?spec=${encodeURIComponent(spec)}&source=${encodeURIComponent(source)}`);
+                const data = await res.json();
+                versionSelect.innerHTML = '<option value="">— выберите версию —</option>';
+                if (data.versions && data.versions.length) {
+                    data.versions.forEach(v => {
+                        const opt = document.createElement('option');
+                        opt.value = v;
+                        opt.textContent = v;
+                        versionSelect.appendChild(opt);
+                    });
+                    versionSelect.disabled = false;
+                    setStatus(`Найдено версий: ${data.versions.length}`);
+                } else {
+                    setStatus('Версии не найдены. Попробуйте ввести вручную в списке ниже.', true);
+                    // Allow manual entry fallback
+                    const opt = document.createElement('option');
+                    opt.value = '__manual__';
+                    opt.textContent = '— ввести вручную —';
+                    versionSelect.appendChild(opt);
+                    versionSelect.disabled = false;
+                }
+            } catch (e) {
+                setStatus('Ошибка загрузки версий: ' + e.message, true);
+            }
+        }
+
+        // Load versions when spec changes (after debounce)
+        let debounceTimer;
+        specInput.addEventListener('input', () => {
+            clearTimeout(debounceTimer);
+            const spec = specInput.value.trim();
+            if (/^\d{2,3}\.\d{2,4}$/.test(spec)) {
+                debounceTimer = setTimeout(() => loadVersions(spec), 400);
+            }
+        });
+
+        refreshBtn.addEventListener('click', () => {
+            const spec = specInput.value.trim();
+            if (/^\d{2,3}\.\d{2,4}$/.test(spec)) {
+                const source = document.getElementById('source').value;
+                fetch(`/api/refresh/${encodeURIComponent(spec)}?source=${encodeURIComponent(source)}`)
+                    .then(r => r.json())
+                    .then(d => {
+                        versionSelect.innerHTML = '<option value="">— выберите версию —</option>';
+                        if (d.versions && d.versions.length) {
+                            d.versions.forEach(v => {
+                                const opt = document.createElement('option');
+                                opt.value = v; opt.textContent = v;
+                                versionSelect.appendChild(opt);
+                            });
+                            versionSelect.disabled = false;
+                            setStatus(`Список обновлён: ${d.versions.length} версий (${d.source})`);
+                        }
+                    });
+            } else {
+                setStatus('Введите корректный номер спецификации (напр. 29.274)', true);
+            }
+        });
+
+        // Re-load versions when the source selector changes
+        document.getElementById('source').addEventListener('change', () => {
+            const spec = specInput.value.trim();
+            if (/^\d{2,3}\.\d{2,4}$/.test(spec)) {
+                loadVersions(spec);
+            }
+        });
+
+        // Click on table row fills spec
+        document.querySelectorAll('.spec-table tr.clickable').forEach(row => {
+            row.addEventListener('click', () => {
+                const spec = row.dataset.spec;
+                specInput.value = spec;
+                loadVersions(spec);
+            });
+        });
+
+        // Manual version input support
+        versionSelect.addEventListener('change', () => {
+            if (versionSelect.value === '__manual__') {
+                const manual = prompt('Введите версию в формате X.Y.Z, например 15.3.0');
+                if (manual && /^\d+\.\d+\.\d+$/.test(manual)) {
+                    const opt = document.createElement('option');
+                    opt.value = manual; opt.textContent = manual;
+                    versionSelect.appendChild(opt);
+                    versionSelect.value = manual;
+                } else {
+                    versionSelect.value = '';
+                }
+            }
+        });
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const spec = specInput.value.trim();
+            const version = versionSelect.value;
+            const source = document.getElementById('source').value;
+            const extract = document.getElementById('extract').checked;
+
+            if (!/^\d{2,3}\.\d{2,4}$/.test(spec)) {
+                setStatus('Некорректный номер спецификации', true);
+                return;
+            }
+            if (!version) {
+                setStatus('Выберите версию', true);
+                return;
+            }
+            setStatus(`Скачиваю ${spec} v${version} (${source})…`);
+            result.classList.add('hidden');
+            const btn = document.getElementById('download-btn');
+            btn.disabled = true;
+            try {
+                const res = await fetch('/api/download', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({spec, version, source, extract})
+                });
+                const data = await res.json();
+                if (data.ok) {
+                    setStatus('Готово!');
+                    result.classList.remove('hidden');
+                    result.innerHTML = `
+                        <p><strong>Файл:</strong> ${data.file}</p>
+                        <p><strong>Источник:</strong> ${data.source}</p>
+                        <p><a href="${data.download_url}" class="btn">Скачать файл</a></p>
+                        <p class="mono small">${data.path}</p>
+                    `;
+                } else {
+                    setStatus(`Ошибка: ${data.error}`, true);
+                }
+            } catch (err) {
+                setStatus('Ошибка: ' + err.message, true);
+            } finally {
+                btn.disabled = false;
+            }
+        });
+
+        // ---- Batch download ----
+        const batchForm = document.getElementById('batch-form');
+        const batchStatus = document.getElementById('batch-status');
+        const batchResult = document.getElementById('batch-result');
+
+        function setBatchStatus(text, isError) {
+            batchStatus.textContent = text;
+            batchStatus.className = 'status' + (isError ? ' error' : '');
+        }
+
+        batchForm.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const text = document.getElementById('batch-list').value.trim();
+            const source = document.getElementById('batch-source').value;
+            const extract = document.getElementById('batch-extract').checked;
+
+            const specs = [];
+            text.split(/\r?\n/).forEach(line => {
+                line = line.trim();
+                if (!line || line.startsWith('#')) return;
+                const idx = line.indexOf(':');
+                if (idx > 0) {
+                    specs.push({spec: line.slice(0, idx).trim(),
+                                version: line.slice(idx + 1).trim()});
+                }
+            });
+            if (!specs.length) {
+                setBatchStatus('Введите хотя бы одну спецификацию в формате номер:версия', true);
+                return;
+            }
+            setBatchStatus(`Скачиваю ${specs.length} спецификаций (${source})…`);
+            batchResult.classList.add('hidden');
+            const btn = document.getElementById('batch-btn');
+            btn.disabled = true;
+            try {
+                const res = await fetch('/api/download-many', {
+                    method: 'POST',
+                    headers: {'Content-Type': 'application/json'},
+                    body: JSON.stringify({specs, source, extract})
+                });
+                const data = await res.json();
+                if (!data.ok) {
+                    setBatchStatus(`Ошибка: ${data.error}`, true);
+                    return;
+                }
+                setBatchStatus(`Готово: ${data.succeeded}/${data.total} успешно`);
+                batchResult.classList.remove('hidden');
+                let rows = '<table class="spec-table"><thead><tr><th>Спецификация</th><th>Статус</th><th>Файл</th></tr></thead><tbody>';
+                data.items.forEach(item => {
+                    const fileCell = item.ok
+                        ? `<a href="${item.download_url}">${item.file}</a>`
+                        : `<span class="small">${item.error || ''}</span>`;
+                    const statusCell = item.ok ? 'OK' : 'FAIL';
+                    rows += `<tr><td class="mono">${item.key}</td><td>${statusCell}</td><td>${fileCell}</td></tr>`;
+                });
+                rows += '</tbody></table>';
+                batchResult.innerHTML = rows;
+            } catch (err) {
+                setBatchStatus('Ошибка: ' + err.message, true);
+            } finally {
+                btn.disabled = false;
+            }
+        });
+    </script>
+</body>
+</html>

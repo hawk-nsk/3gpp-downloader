@@ -1,0 +1,82 @@
+* { box-sizing: border-box; margin: 0; padding: 0; }
+
+body {
+    font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+    background: #f4f6f9;
+    color: #222;
+    line-height: 1.5;
+}
+
+header {
+    background: #1a2a3a;
+    color: #fff;
+    padding: 24px 40px;
+}
+header h1 { font-size: 24px; margin-bottom: 4px; }
+header .subtitle { color: #9db3c7; font-size: 14px; }
+
+main {
+    max-width: 960px;
+    margin: 24px auto;
+    padding: 0 16px;
+}
+
+.card {
+    background: #fff;
+    border-radius: 8px;
+    box-shadow: 0 1px 4px rgba(0,0,0,.1);
+    padding: 24px;
+    margin-bottom: 24px;
+}
+.card h2 { font-size: 18px; margin-bottom: 16px; color: #1a2a3a; }
+
+.row { display: flex; gap: 16px; flex-wrap: wrap; margin-bottom: 12px; align-items: flex-end; }
+.field { flex: 1; min-width: 180px; }
+.field label { display: block; font-size: 13px; color: #555; margin-bottom: 4px; }
+
+input[type="text"], select {
+    width: 100%;
+    padding: 8px 10px;
+    border: 1px solid #ccc;
+    border-radius: 4px;
+    font-size: 14px;
+}
+input[type="text"]:focus, select:focus { outline: none; border-color: #1a7fd0; }
+
+.checkbox { display: flex; align-items: center; gap: 6px; font-size: 14px; color: #444; }
+
+.actions { margin-top: 12px; }
+
+.btn {
+    display: inline-block;
+    padding: 8px 16px;
+    border: none;
+    border-radius: 4px;
+    background: #e8eef4;
+    color: #1a2a3a;
+    font-size: 14px;
+    cursor: pointer;
+    text-decoration: none;
+    text-align: center;
+}
+.btn.primary { background: #1a7fd0; color: #fff; }
+.btn.primary:hover { background: #1569b0; }
+.btn.small { padding: 5px 10px; font-size: 12px; margin-top: 6px; }
+.btn:disabled { opacity: .6; cursor: not-allowed; }
+
+.status { margin-top: 12px; padding: 10px 12px; border-radius: 4px; background: #eef4fb; color: #1a2a3a; font-size: 14px; }
+.status.error { background: #fdecec; color: #b00020; }
+
+.result { margin-top: 12px; padding: 14px; border-radius: 4px; background: #eef8ee; border: 1px solid #b8e0b8; }
+.result.hidden { display: none; }
+.result p { margin-bottom: 6px; }
+
+.mono { font-family: "Consolas", "Courier New", monospace; font-size: 13px; }
+.small { font-size: 12px; color: #777; }
+
+.spec-table { width: 100%; border-collapse: collapse; font-size: 14px; }
+.spec-table th, .spec-table td { text-align: left; padding: 8px 10px; border-bottom: 1px solid #eee; }
+.spec-table th { color: #666; font-weight: 600; }
+.spec-table tr.clickable { cursor: pointer; }
+.spec-table tr.clickable:hover { background: #f0f6fc; }
+.spec-table td.mono { font-size: 13px; white-space: nowrap; }
